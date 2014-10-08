@@ -46,13 +46,11 @@ void setup()
   pinMode(ledPin_player1, OUTPUT);
   pinMode(ledPin_player2, OUTPUT);
   pinMode(enablePin, OUTPUT);
-
-  //digitalWrite(enablePin, HIGH);  // disable RFID Reader
   
   // setup Arduino Serial Monitor
   Serial.begin(9600);
   while (!Serial);   // wait until ready
-  Serial.println("\n\nParallax RFID Card Reader");
+  //Serial.println("\n\nParallax RFID Card Reader");
   
   // set the baud rate for the SoftwareSerial port
   rfidSerial.begin(2400);
@@ -64,16 +62,13 @@ void setup()
 }
 
 void loop()
-{
-  
+{ 
   if (!(player1_signedin == true && player2_signedin == true))
   {
     readPlayersRFID();
   }
   val_player1 = digitalRead(inPin_player1);
   val_player2 = digitalRead(inPin_player2);
-  //Serial.println(val);
-  //delay(500);
   
   if (val_player1 == LOW & (game_over == false)) // Player1 Pushed the button
   { 
@@ -92,22 +87,23 @@ void loop()
       }
     }
     
-    //ledBlink(score_player1, ledPin_player1);
-    //Serial.println(score);
-    //delay(500);
-    //digitalWrite(ledPin, HIGH); // LED OFF
-    //delay(500);
+    /* Blinking LED for Player1
+    ledBlink(score_player1, ledPin_player1);
+    Serial.println(score);
+    delay(500);
+    digitalWrite(ledPin, HIGH); // LED OFF
+    delay(500); */
   }
   else if (val_player2 == LOW & (game_over == false)) // Player1 Pushed the button
   {
     score_player2++; 
-    //ledBlink(score_player2, ledPin_player2);
+    /* Blinking LED for player2
+    ledBlink(score_player2, ledPin_player2); */
   }
   else
   {
     digitalWrite(ledPin_player1, LOW); // LED ON
     digitalWrite(ledPin_player2, LOW);
-    //Serial.println(val);
   }
   
   if (score_player1 > MAX_POINTS || score_player2 > MAX_POINTS)
@@ -124,7 +120,9 @@ void loop()
   Serial.println("");
 }
 
-// Function reads RFID of player1 and player2. Player1 can be predefined as left player, and player2 as right player
+/* Function reads RFID of player1 and player2. 
+   Player1 can be predefined as left player, and player2 as right player
+*/
 void readPlayersRFID()
 { 
   char rfidData[BUFSIZE];  // Buffer for incoming data
@@ -153,20 +151,15 @@ void readPlayersRFID()
     if (rfidSerial.available() > 0 && !(player1_signedin == true && player2_signedin == true)) // If there are any bytes available to read, then the RFID Reader has probably seen a valid tag
     {
       rfidData[offset] = rfidSerial.read();  // Get the byte and store it in our buffer
-      Serial.println(rfidData[offset]);
-      //Serial.println("\n");
+      
+      // Serial.println(rfidData[offset]); // Debug String to print all the bytes received over UART
+      
       if (rfidData[offset] == RFID_START)    // If we receive the start byte from the RFID Reader, then get ready to receive the tag's unique ID
       {
-        Serial.println("start start");
-        Serial.println(rfidData[offset]);
-        Serial.println("start end");
         offset = -1;     // Clear offset (will be incremented back to 0 at the end of the loop)
       }
       else if (rfidData[offset] == RFID_STOP)  // If we receive the stop byte from the RFID Reader, then the tag's entire unique ID has been sent
       {
-        Serial.println("stop start");
-        Serial.println(rfidData[offset]);
-        Serial.println("stop end");
         rfidData[offset] = 0; // Null terminate the string of bytes we just received
         
         if (player1_signedin == false)
@@ -197,22 +190,20 @@ void readPlayersRFID()
         // Break out of the loop only when both of players have tagged in
         if(player1_signedin == true && player2_signedin == true)
         {
-          Serial.println("Breaking out of while loop"); 
+          //Serial.println("Breaking out of while loop"); 
           break;  // Break out of while loop        
         }  
       }
           
       offset++;  // Increment offset into array
       if (offset >= BUFSIZE) offset = 0; // If the incoming data string is longer than our buffer, wrap around to avoid going out-of-bounds
-    }
-       
+    }    
   }
-  
-  //digitalWrite(enablePin, HIGH);   // disable the RFID Reader
   Serial.println("\n\n RFID Card Reader Disabled");
 }
 
-// This function would blink player LED n times. n is player's score  
+/* This function would blink player LED n times. n is player's score  
+*/
 void ledBlink(int score, int led_player)
 {
    int i;
