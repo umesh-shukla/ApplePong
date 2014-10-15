@@ -4,12 +4,12 @@
 // Pins
 #define ledPin_player1 12 
 #define ledPin_player2 13 
-#define inPin_player1  6
-#define inPin_player2 7
+#define inPin_player1  2
+#define inPin_player2 3
 #define enablePin  10   // Connects to the RFID's ENABLE pin
 #define rxPin      0  // Serial input (connects to the RFID's SOUT pin)
 #define txPin      1  // Serial output (unused)
-
+#define DebounceTimeLimit (unsigned long)(300*1000)
 // Globals
 #define BUFSIZE     11  // Size of receive buffer (in bytes) (10-byte unique ID + null character)
 #define RFID_START  0x0A  // RFID Reader Start and Stop bytes
@@ -26,9 +26,10 @@ int score_player1 = 0;
 int score_player2 = 0;
 
 // Debouncing vars
-int DebounceTimeLimit = 300; 
+//sunsigned long int DebounceTimeLimit = 300*1000; //in ms  
 int totDebounceTime = 0; 
 int lastTimeButtonPushed = 0; 
+volatile unsigned long int last_micros_1 = 0,last_micros_2 = 0;
 
 boolean game_over = false; 
 
@@ -52,8 +53,18 @@ void setup()
   while (!Serial);   // wait until ready
   //Serial.println("\n\nParallax RFID Card Reader");
   
-  // set the baud rate for the SoftwareSerial port
+  ///set the baud rate for the SoftwareSerial port
   rfidSerial.begin(2400);
+  
+  attachInterrupt(0, player1_switch_interrupt, CHANGE);
+  attachInterrupt(1, player2_switch_interrupt, CHANGE);
+  
+  /*
+  __enable_interrupt();//enabling the global intruppt
+  
+  EICRA |= 0x0; //Low level on the INT0 and INT1 trigger interrupt
+  
+  EIMSK |= 0x1; // Enabling INT0;*/
 
   digitalWrite(enablePin, LOW);   // enable the RFID Reader
   Serial.println("\n\n RFID Card Reader enabled");
@@ -67,25 +78,7 @@ void loop()
   {
     readPlayersRFID();
   }
-  val_player1 = digitalRead(inPin_player1);
-  val_player2 = digitalRead(inPin_player2);
-  
-  if (val_player1 == LOW & (game_over == false)) // Player1 Pushed the button
-  { 
-    if (lastTimeButtonPushed)
-    {
-      lastTimeButtonPushed = millis(); 
-      score_player1++; 
-    }
-    else
-    {
-      totDebounceTime = millis() - lastTimeButtonPushed; 
-      lastTimeButtonPushed = millis(); 
-      if (totDebounceTime > DebounceTimeLimit)
-      {
-       score_player1++; 
-      }
-    }
+
     
     /* Blinking LED for Player1
     ledBlink(score_player1, ledPin_player1);
@@ -93,25 +86,15 @@ void loop()
     delay(500);
     digitalWrite(ledPin, HIGH); // LED OFF
     delay(500); */
-  }
-  else if (val_player2 == LOW & (game_over == false)) // Player1 Pushed the button
-  {
-    score_player2++; 
-    /* Blinking LED for player2
-    ledBlink(score_player2, ledPin_player2); */
-  }
-  else
-  {
-    digitalWrite(ledPin_player1, LOW); // LED ON
-    digitalWrite(ledPin_player2, LOW);
-  }
   
   if (score_player1 > MAX_POINTS || score_player2 > MAX_POINTS)
   {
     game_over = true; 
+    player1_signedin = false;
+    player2_signedin = false;
   }
   
-  delay (300);
+  delay (1000);
   
   Serial.print("Score: ");
   Serial.print(score_player1);
@@ -216,3 +199,39 @@ void ledBlink(int score, int led_player)
      delay(500);
    }
 }
+
+void player1_switch_interrupt()
+{
+  unsigned long temp ;
+
+ temp = (micros() - last_micros_1)  >> 10;
+  
+  if(temp > 1000)
+  { 
+    if (game_over == false)
+    {
+       score_player1++;
+    } 
+    last_micros_1 = micros();
+ 
+  }
+  
+}
+
+void player2_switch_interrupt()
+{
+  unsigned long temp ;
+
+  temp = (micros() - last_micros_2)  >> 10;
+  
+  if(temp > 1000)
+  { 
+    if (game_over == false)
+    {
+       score_player2++;
+    } 
+    last_micros_2 = micros();
+ 
+  }
+}
+
