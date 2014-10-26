@@ -9,35 +9,25 @@
 #define enablePin  10   // Connects to the RFID's ENABLE pin
 #define rxPin      0  // Serial input (connects to the RFID's SOUT pin)
 #define txPin      1  // Serial output (unused)
-#define DebounceTimeLimit (unsigned long)(300*1000)
-// Globals
 #define BUFSIZE     11  // Size of receive buffer (in bytes) (10-byte unique ID + null character)
 #define RFID_START  0x0A  // RFID Reader Start and Stop bytes
 #define RFID_STOP   0x0D
+#define MAX_POINTS 5 // Max Game score
+#define DebounceTimeLimit 1000 // DebounceTimeLimit for push buttons
 
-// Player Scores, and values
-#define MAX_POINTS 5
-
-boolean player1_signedin = false; 
-boolean player2_signedin = false; 
-int val_player1 = 0;
-int val_player2 = 0;
-int score_player1 = 0;
-int score_player2 = 0;
+// Player related globals
+boolean player1_signedin, player2_signedin, game_over ; 
+int score_player1, score_player2;
 
 // Debouncing vars
-//sunsigned long int DebounceTimeLimit = 300*1000; //in ms  
-int totDebounceTime = 0; 
-int lastTimeButtonPushed = 0; 
-volatile unsigned long int last_micros_1 = 0,last_micros_2 = 0;
+volatile unsigned long int last_micros_1,last_micros_2;
 
-boolean game_over = false; 
-
-// set up a new serial port
+// Set up a new serial port
 SoftwareSerial rfidSerial =  SoftwareSerial(rxPin, txPin);
 
 void setup()
 {
+  
   // Input pins
   pinMode(inPin_player1, INPUT);
   pinMode(inPin_player2, INPUT);
@@ -51,24 +41,11 @@ void setup()
   // setup Arduino Serial Monitor
   Serial.begin(9600);
   while (!Serial);   // wait until ready
-  //Serial.println("\n\nParallax RFID Card Reader");
-  
-  ///set the baud rate for the SoftwareSerial port
-  rfidSerial.begin(2400);
+  rfidSerial.begin(2400);   //set the baud rate for the SoftwareSerial port
   
   attachInterrupt(0, player1_switch_interrupt, CHANGE);
   attachInterrupt(1, player2_switch_interrupt, CHANGE);
-  
-  /*
-  __enable_interrupt();//enabling the global intruppt
-  
-  EICRA |= 0x0; //Low level on the INT0 and INT1 trigger interrupt
-  
-  EIMSK |= 0x1; // Enabling INT0;*/
-
-  digitalWrite(enablePin, LOW);   // enable the RFID Reader
-  Serial.println("\n\n RFID Card Reader enabled");
-  
+  initApplePongGlobals(); // init globals   
   Serial.flush();   // wait for all bytes to be transmitted to the Serial Monitor
 }
 
@@ -78,7 +55,6 @@ void loop()
   {
     readPlayersRFID();
   }
-
     
     /* Blinking LED for Player1
     ledBlink(score_player1, ledPin_player1);
@@ -96,11 +72,20 @@ void loop()
   
   delay (1000);
   
-  Serial.print("Score: ");
-  Serial.print(score_player1);
-  Serial.print("\t");
-  Serial.print(score_player2);
-  Serial.println("");
+  if(!game_over)
+  {
+    Serial.print("Score: ");
+    Serial.print(score_player1);
+    Serial.print("\t");
+    Serial.print(score_player2);
+    Serial.println("");
+  }
+  else
+  {
+    Serial.println("Game over. Restarting another match");
+    initApplePongGlobals();
+  }
+
 }
 
 /* Function reads RFID of player1 and player2. 
@@ -182,6 +167,9 @@ void readPlayersRFID()
       if (offset >= BUFSIZE) offset = 0; // If the incoming data string is longer than our buffer, wrap around to avoid going out-of-bounds
     }    
   }
+  
+  rfidSerial.flush();
+  digitalWrite(enablePin, HIGH);
   Serial.println("\n\n RFID Card Reader Disabled");
 }
 
@@ -200,13 +188,19 @@ void ledBlink(int score, int led_player)
    }
 }
 
+/*
+ ISR for Player1 Incermental Push button
+*/
+
 void player1_switch_interrupt()
 {
   unsigned long temp ;
-
- temp = (micros() - last_micros_1)  >> 10;
   
-  if(temp > 1000)
+  if (!(player1_signedin && player2_signedin))
+    return; 
+  temp = (micros() - last_micros_1)  >> 10;
+  
+  if(temp > DebounceTimeLimit)
   { 
     if (game_over == false)
     {
@@ -218,13 +212,19 @@ void player1_switch_interrupt()
   
 }
 
+/*
+ ISR for Player2 Incermental Push button
+*/
 void player2_switch_interrupt()
 {
   unsigned long temp ;
 
+  if (!(player1_signedin && player2_signedin))
+    return; 
+    
   temp = (micros() - last_micros_2)  >> 10;
   
-  if(temp > 1000)
+  if(temp > DebounceTimeLimit)
   { 
     if (game_over == false)
     {
@@ -233,5 +233,20 @@ void player2_switch_interrupt()
     last_micros_2 = micros();
  
   }
+}
+
+void initApplePongGlobals()
+{
+    game_over = false; 
+    player1_signedin = false;
+    player2_signedin = false;
+    score_player1 = 0;
+    score_player2 = 0;
+    last_micros_1 = 0; 
+    last_micros_2 = 0;
+    
+    digitalWrite(enablePin, LOW);   // enable the RFID Reader
+    rfidSerial.flush();
+    Serial.println("\n\n RFID Card Reader enabled");
 }
 
